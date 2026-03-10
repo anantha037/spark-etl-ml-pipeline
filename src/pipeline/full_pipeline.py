@@ -82,11 +82,11 @@ def stage_etl(spark: SparkSession) -> tuple:
     clean_df = handle_nulls(clean_df)
     clean_df = engineer_features(clean_df)
     clean_df = select_final_columns(clean_df)
-    log.info("[ETL] Transform plan built ✅")
+    log.info("[ETL] Transform plan built")
 
     # Load — write to Parquet (skip if exists)
     if os.path.exists(PROCESSED_PATH) and os.listdir(PROCESSED_PATH):
-        log.info("[ETL] Parquet already exists — skipping write ✅")
+        log.info("[ETL] Parquet already exists — skipping write")
         clean_df = spark.read.parquet(PROCESSED_PATH)
     else:
         clean_df.write.mode("overwrite") \
@@ -210,7 +210,7 @@ def stage_save_predictions(spark: SparkSession,
     preds_with_confidence.select(
         "generous_tipper", "prediction", "confidence"
     ).write.mode("overwrite").parquet(pred_path)
-    log.info(f"[Save] Predictions saved → {pred_path} ✅")
+    log.info(f"[Save] Predictions saved → {pred_path}")
 
     # Sample — show 10 real prediction examples
     log.info("[Save] Sample predictions:")
@@ -236,21 +236,27 @@ def stage_save_predictions(spark: SparkSession,
          .alias("avg_confidence"),
     )
 
+    summary_row = summary.collect()[0].asDict()
+    log.info("[Save] Summary computed:")
+    for k, v in summary_row.items():
+        log.info(f"         {k}: {v}")
+
     try:
         summary.write.mode("overwrite").jdbc(
             url=POSTGRES_URL, table="prediction_summary",
             properties=POSTGRES_PROPS
         )
-        log.info("[Save] Prediction summary → PostgreSQL ✅")
-        summary.show(truncate=False)
+        log.info("[Save] Prediction summary → PostgreSQL")
     except Exception as e:
         log.warning(f"[Save] Postgres write skipped: {e}")
-        # Save summary as CSV fallback
         fallback = f"{OUTPUT_PATH}/prediction_summary"
-        summary.coalesce(1).write.mode("overwrite") \
-               .option("header", "true").csv(fallback)
-        log.info(f"[Save] Summary saved to CSV → {fallback} ✅")
-        summary.show(truncate=False)
+        os.makedirs(fallback, exist_ok=True)
+        import csv
+        with open(f"{fallback}/summary.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=summary_row.keys())
+            w.writeheader()
+            w.writerow(summary_row)
+        log.info(f"[Save] Summary saved to CSV → {fallback}/summary.csv ")
 
     duration = round(time.time() - t, 1)
     log.info(f"[Save] Complete in {duration}s")
@@ -292,7 +298,7 @@ def run_full_pipeline():
 
     # ── Final Report ───────────────────────────────────────────────────────
     total_time = round(time.time() - pipeline_start, 1)
-    banner("FULL PIPELINE COMPLETE ✅")
+    banner("FULL PIPELINE COMPLETE")
     log.info(f"  {'Stage':<12} {'Duration':>10}")
     log.info(f"  {'─'*24}")
     for stage, dur in timings.items():
@@ -318,3 +324,4 @@ def run_full_pipeline():
 
 if __name__ == "__main__":
     run_full_pipeline()
+

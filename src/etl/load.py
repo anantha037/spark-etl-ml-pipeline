@@ -44,7 +44,7 @@ def write_parquet(df: DataFrame, path: str) -> int:
     import os
     # Skip writing if already exists — saves 5 minutes on re-runs
     if os.path.exists(path) and os.listdir(path):
-        log.info(f"[Parquet] Already exists at {path} — skipping write ✅")
+        log.info(f"[Parquet] Already exists at {path} — skipping write")
         written_df = df.sparkSession.read.parquet(path)
         row_count = written_df.count()
         log.info(f"[Parquet] Verified: {row_count:,} rows on disk")
@@ -63,7 +63,7 @@ def write_parquet(df: DataFrame, path: str) -> int:
     written_df = df.sparkSession.read.parquet(path)
     row_count  = written_df.count()
 
-    log.info(f"[Parquet] ✅ Written: {row_count:,} rows")
+    log.info(f"[Parquet] Written: {row_count:,} rows")
     log.info(f"[Parquet] Partitions created:")
 
     written_df.groupBy("source_month") \
@@ -106,11 +106,11 @@ def write_postgres(df: DataFrame, table: str, url: str, props: dict) -> None:
         summary_df.write \
             .mode("overwrite") \
             .jdbc(url=url, table=table, properties=props)
-        log.info(f"[Postgres] ✅ Written to table: {table}")
+        log.info(f"[Postgres] Written to table: {table}")
         summary_df.show(20, truncate=False)
 
     except Exception as e:
-        log.warning(f"[Postgres] ⚠️  Could not write to PostgreSQL: {e}")
+        log.warning(f"[Postgres] Could not write to PostgreSQL: {e}")
         log.warning("[Postgres] Saving summary as CSV fallback instead...")
 
         fallback_path = "/home/anantha/spark-etl-ml-project/data/output/summary"
@@ -119,7 +119,7 @@ def write_postgres(df: DataFrame, table: str, url: str, props: dict) -> None:
                   .mode("overwrite") \
                   .option("header", "true") \
                   .csv(fallback_path)
-        log.info(f"[Postgres] ✅ Summary saved to CSV: {fallback_path}")
+        log.info(f"[Postgres] Summary saved to CSV: {fallback_path}")
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -145,7 +145,7 @@ def run_load(spark: SparkSession) -> DataFrame:
     write_postgres(clean_df, "trip_summary", POSTGRES_URL, POSTGRES_PROPS)
 
     log.info("=" * 55)
-    log.info("LOAD COMPLETE ✅")
+    log.info("LOAD COMPLETE !!!")
     log.info(f"  Raw rows in     : {raw_count:,}")
     log.info(f"  Clean rows out  : {final_count:,}")
     log.info(f"  Rows removed    : {raw_count - final_count:,} ({((raw_count-final_count)/raw_count*100):.1f}%)")
@@ -172,13 +172,13 @@ if __name__ == "__main__":
 
     clean_df = run_load(spark)
 
-    print("\n✅ FINAL VERIFICATION — Partition sizes:")
+    print("\n FINAL VERIFICATION — Partition sizes:")
     clean_df.groupBy("source_month") \
             .count() \
             .orderBy("source_month") \
             .show()
 
-    print("\n✅ SCHEMA OF LOADED DATA:")
+    print("\n SCHEMA OF LOADED DATA:")
     clean_df.printSchema()
 
     spark.stop()

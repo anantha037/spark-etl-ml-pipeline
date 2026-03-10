@@ -63,7 +63,7 @@ def test_partition_pruning(spark: SparkSession):
 
     log.info(f"  Without pruning : {t_without}s → {count_all:,} rows (reads all partitions)")
     log.info(f"  With pruning    : {t_with}s → {count_pruned:,} rows (reads 1 partition only)")
-    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster ✅")
+    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster")
 
     return {"without": t_without, "with": t_with}
 
@@ -101,7 +101,7 @@ def test_caching(spark: SparkSession):
 
     log.info(f"  Without cache   : {t_without}s (3 actions × full disk read)")
     log.info(f"  With cache      : {t_with}s (3 actions × RAM read)")
-    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster ✅")
+    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster")
 
     return {"without": t_without, "with": t_with}
 
@@ -136,7 +136,7 @@ def test_column_pruning(spark: SparkSession):
 
     log.info(f"  Without pruning : {t_without}s (28 cols in memory)")
     log.info(f"  With pruning    : {t_with}s (2 cols in memory)")
-    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster ✅")
+    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster")
 
     return {"without": t_without, "with": t_with}
 
@@ -171,7 +171,7 @@ def test_aqe(spark: SparkSession):
 
     log.info(f"  Without AQE     : {t_without}s")
     log.info(f"  With AQE        : {t_with}s")
-    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster ✅")
+    log.info(f"  Speedup         : {round(t_without/t_with, 1)}x faster")
 
     return {"without": t_without, "with": t_with}
 
@@ -199,6 +199,6 @@ if __name__ == "__main__":
     log.info(f"  Column Pruning    : {r3['without']}s → {r3['with']}s  ({round(r3['without']/max(r3['with'],0.1),1)}x)")
     log.info(f"  AQE               : {r4['without']}s → {r4['with']}s  ({round(r4['without']/max(r4['with'],0.1),1)}x)")
     log.info("═" * 55)
-    log.info("These optimizations are already applied in our pipeline ✅")
+    log.info("These optimizations are already applied in our pipeline")
 
     spark.stop()

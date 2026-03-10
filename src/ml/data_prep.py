@@ -163,7 +163,7 @@ def prepare_ml_data(spark: SparkSession):
 
     # Keep only what we need: features vector + label
     ml_df = ml_df.select("features", "generous_tipper")
-    log.info(f"Feature vector created ✅")
+    log.info(f"Feature vector created.")
 
     # Train / Test split — 80/20, fixed seed for reproducibility
     train_df, test_df = ml_df.randomSplit([0.8, 0.2], seed=42)
@@ -189,7 +189,7 @@ def prepare_ml_data(spark: SparkSession):
     fitted.write().overwrite().save(model_path)
 
     log.info("=" * 55)
-    log.info("ML DATA PREP COMPLETE ✅")
+    log.info("ML DATA PREP COMPLETE !!!")
     log.info(f"  Train : {train_count:,} rows → {ML_DATA_PATH}/train")
     log.info(f"  Test  : {test_count:,} rows  → {ML_DATA_PATH}/test")
     log.info(f"  Pipeline saved → {model_path}")
@@ -202,8 +202,8 @@ if __name__ == "__main__":
     spark = get_spark()
     train_df, test_df, pipeline = prepare_ml_data(spark)
 
-    print("\n✅ Sample of ML-ready training data:")
+    print("\nSample of ML-ready training data:")
     train_df.show(3, truncate=True)
 
-    print(f"\n✅ Feature vector size: {len(train_df.first()['features'])}")
+    print(f"\nFeature vector size: {len(train_df.first()['features'])}")
     spark.stop()

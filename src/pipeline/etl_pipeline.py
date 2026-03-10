@@ -79,7 +79,7 @@ def run_pipeline():
     log.info(f"Pipeline started at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     spark = create_pipeline_spark_session()
-    log.info(f"Spark {spark.version} session ready ✅")
+    log.info(f"Spark {spark.version} session ready.")
 
     # ══════════════════════════════════════════════════════════════════════
     # PHASE 1 — EXTRACT
@@ -91,14 +91,14 @@ def run_pipeline():
         taxi_df, zone_df = run_extract(spark)
         raw_count = taxi_df.count()
 
-        results["extract"]["status"]   = "✅ SUCCESS"
+        results["extract"]["status"]   = "SUCCESS"
         results["extract"]["rows"]     = raw_count
         results["extract"]["duration"] = round(time.time() - phase_start, 1)
 
         log.info(f"Extract complete — {raw_count:,} rows in {results['extract']['duration']}s")
 
     except Exception as e:
-        results["extract"]["status"] = f"❌ FAILED: {e}"
+        results["extract"]["status"] = f"FAILED: {e}"
         log.error(f"Extract phase failed: {e}")
         spark.stop()
         _print_summary(results, time.time() - pipeline_start)
@@ -125,12 +125,12 @@ def run_pipeline():
         clean_df = engineer_features(clean_df)
         clean_df = select_final_columns(clean_df)
 
-        results["transform"]["status"]   = "✅ SUCCESS"
+        results["transform"]["status"]   = "SUCCESS"
         results["transform"]["duration"] = round(time.time() - phase_start, 1)
         log.info(f"Transform complete — plan built in {results['transform']['duration']}s")
 
     except Exception as e:
-        results["transform"]["status"] = f"❌ FAILED: {e}"
+        results["transform"]["status"] = f"FAILED: {e}"
         log.error(f"Transform phase failed: {e}")
         # Don't exit — we can still report partial results
         spark.stop()
@@ -151,13 +151,13 @@ def run_pipeline():
         loaded_df = spark.read.parquet(PROCESSED_PATH)
         write_postgres(loaded_df, "trip_summary", POSTGRES_URL, POSTGRES_PROPS)
 
-        results["load"]["status"]   = "✅ SUCCESS"
+        results["load"]["status"]   = "SUCCESS"
         results["load"]["rows"]     = final_count
         results["load"]["duration"] = round(time.time() - phase_start, 1)
         log.info(f"Load complete — {final_count:,} rows written in {results['load']['duration']}s")
 
     except Exception as e:
-        results["load"]["status"] = f"❌ FAILED: {e}"
+        results["load"]["status"] = f"FAILED: {e}"
         log.error(f"Load phase failed: {e}")
 
     # ══════════════════════════════════════════════════════════════════════
@@ -188,7 +188,7 @@ def _print_summary(results: dict, total_time: float):
     log.info(f"  Total time     : {total_time}s ({round(total_time/60, 1)} min)")
     log.info("  " + "─" * 51)
     all_ok = all("SUCCESS" in v["status"] for v in results.values())
-    log.info(f"  Pipeline result: {'✅ ALL PHASES PASSED' if all_ok else '❌ SOME PHASES FAILED'}")
+    log.info(f"  Pipeline result: {'ALL PHASES PASSED' if all_ok else 'SOME PHASES FAILED'}")
     print_banner("END OF PIPELINE")
 
 

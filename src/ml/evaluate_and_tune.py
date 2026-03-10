@@ -162,7 +162,7 @@ def tune_classifier(train_df: DataFrame, test_df: DataFrame):
     t_start  = time.time()
     cv_model = cv.fit(tune_df)
     t_cv     = round(time.time() - t_start, 1)
-    log.info(f"Cross-validation complete in {t_cv}s ✅")
+    log.info(f"Cross-validation complete in {t_cv}s")
 
     # Best model parameters
     best_model  = cv_model.bestModel
@@ -210,7 +210,7 @@ def tune_classifier(train_df: DataFrame, test_df: DataFrame):
     # Save best model
     save_path = f"{MODELS_PATH}/rf_tuned_best"
     best_model.write().overwrite().save(save_path)
-    log.info(f"Tuned model saved → {save_path} ✅")
+    log.info(f"Tuned model saved → {save_path}")
 
     return best_model, {
         "accuracy": final_acc, "f1": final_f1, "auc": final_auc,

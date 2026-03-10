@@ -42,7 +42,7 @@ VALID_PAYMENT    = [1, 2, 3, 4, 5, 6]
 def remove_duplicates(df: DataFrame) -> DataFrame:
     """Drop exact duplicate rows."""
     df = df.dropDuplicates()
-    log.info("[Step 1] Duplicates removed ✅")
+    log.info("[Step 1] Duplicates removed.")
     return df
 
 
@@ -78,7 +78,7 @@ def filter_invalid_rows(df: DataFrame) -> DataFrame:
         (F.year("tpep_pickup_datetime") == 2023)
     )
 
-    log.info("[Step 2] Invalid row filters applied ✅")
+    log.info("[Step 2] Invalid row filters applied.")
     return df
 
 
@@ -102,7 +102,7 @@ def handle_nulls(df: DataFrame) -> DataFrame:
         "store_and_fwd_flag"  : "N",
     })
 
-    log.info("[Step 3] Nulls filled with defaults ✅")
+    log.info("[Step 3] Nulls filled with defaults.")
     return df
 
 
@@ -186,7 +186,7 @@ def engineer_features(df: DataFrame) -> DataFrame:
         (F.col("avg_speed_mph")     <= MAX_SPEED_MPH)
     )
 
-    log.info("[Step 4] Feature engineering complete ✅")
+    log.info("[Step 4] Feature engineering complete !!!")
     log.info("         New features: trip_duration_min, pickup_hour, pickup_dayofweek,")
     log.info("                       is_weekend, time_of_day, avg_speed_mph,")
     log.info("                       tip_pct, is_airport_trip, fare_per_mile, generous_tipper")
@@ -220,7 +220,7 @@ def select_final_columns(df: DataFrame) -> DataFrame:
     ]
 
     df = df.select(final_cols)
-    log.info(f"[Step 5] Final columns selected: {len(final_cols)} ✅")
+    log.info(f"[Step 5] Final columns selected: {len(final_cols)} !!!")
     return df
 
 
@@ -253,7 +253,7 @@ def run_transform(spark: SparkSession) -> DataFrame:
 
     # ── Don't count here — return the plan, Load phase will execute it ─────
     log.info("=" * 55)
-    log.info("TRANSFORM PLAN BUILT ✅  (execution deferred to Load phase)")
+    log.info("TRANSFORM PLAN BUILT  (execution deferred to Load phase)")
     log.info(f"  Input rows     : {raw_count:,}")
     log.info(f"  Final columns  : {len(df.columns)}")
     log.info(f"  Columns        : {df.columns}")
@@ -280,23 +280,23 @@ if __name__ == "__main__":
     df, raw_count = run_transform(spark)
 
     # ── Preview a small sample to verify correctness (NOT a full count) ────
-    print("\n📋 TRANSFORMED SCHEMA:")
+    print("\n TRANSFORMED SCHEMA:")
     df.printSchema()
 
-    print("\n👀 SAMPLE OF TRANSFORMED DATA (5 rows):")
+    print("\n SAMPLE OF TRANSFORMED DATA (5 rows):")
     df.show(5, truncate=True)
 
-    print("\n📊 QUICK STATS (on 100k sample — avoids full scan):")
+    print("\n QUICK STATS (on 100k sample — avoids full scan):")
     sample = df.sample(fraction=0.01, seed=42)   # ~93k rows
     sample.describe(
         "trip_distance", "trip_duration_min",
         "fare_amount", "tip_pct", "avg_speed_mph"
     ).show()
 
-    print("\n🎯 ML TARGET ON SAMPLE:")
+    print("\n ML TARGET ON SAMPLE:")
     sample.groupBy("generous_tipper").count().show()
 
-    print("\n⏰ TIME OF DAY ON SAMPLE:")
+    print("\n TIME OF DAY ON SAMPLE:")
     sample.groupBy("time_of_day") \
           .agg(
               F.count("*").alias("trips"),

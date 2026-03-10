@@ -48,7 +48,7 @@ def create_spark_session(app_name: str = "NYC_Taxi_ETL") -> SparkSession:
         .getOrCreate()
     )
     spark.sparkContext.setLogLevel("ERROR")
-    log.info(f"Spark {spark.version} session started ✅")
+    log.info(f"Spark {spark.version} session started!")
     return spark
 
 
@@ -90,7 +90,7 @@ def read_taxi_parquet(spark: SparkSession, file_paths: list) -> DataFrame:
         df = df.withColumn("source_month", lit(month))
 
         dataframes.append(df)
-        log.info(f"  ✅ {month}: {df.count():,} rows loaded")
+        log.info(f"{month}: {df.count():,} rows loaded")
 
     # Find common columns across all files
     common_cols = sorted(
@@ -125,7 +125,7 @@ def read_zone_lookup(spark: SparkSession, path: str) -> DataFrame | None:
 
     # Normalize column names
     zone_df = zone_df.toDF(*[c.lower() for c in zone_df.columns])
-    log.info(f"✅ Zone lookup loaded: {zone_df.count():,} zones")
+    log.info(f"Zone lookup loaded: {zone_df.count():,} zones")
     return zone_df
 
 
@@ -147,7 +147,7 @@ def run_extract(spark: SparkSession) -> tuple:
     # ── Summary Report ─────────────────────────────────────────────────────
     total_rows = taxi_df.count()
     log.info("=" * 55)
-    log.info("EXTRACT COMPLETE ✅")
+    log.info("EXTRACT COMPLETE")
     log.info(f"  Total rows     : {total_rows:,}")
     log.info(f"  Total columns  : {len(taxi_df.columns)}")
     log.info(f"  Zone data      : {'Loaded' if zone_df else 'Not available'}")

@@ -66,7 +66,7 @@ def train_classifier(train_df: DataFrame, test_df: DataFrame):
     t_start = time.time()
     model   = rf.fit(train_df)
     t_train = round(time.time() - t_start, 1)
-    log.info(f"Training complete in {t_train}s ✅")
+    log.info(f"Training complete in {t_train}s")
 
     # Predict on test set
     predictions = model.transform(test_df)
@@ -119,7 +119,7 @@ def train_classifier(train_df: DataFrame, test_df: DataFrame):
     # Save model
     save_path = f"{MODELS_PATH}/random_forest_classifier"
     model.write().overwrite().save(save_path)
-    log.info(f"Model saved → {save_path} ✅")
+    log.info(f"Model saved → {save_path}")
 
     return model, predictions, {
         "auc": auc, "accuracy": accuracy,
@@ -175,7 +175,7 @@ def train_regressor(spark: SparkSession):
     t_start = time.time()
     model   = lr.fit(train_df)
     t_train = round(time.time() - t_start, 1)
-    log.info(f"Training complete in {t_train}s ✅")
+    log.info(f"Training complete in {t_train}s")
 
     predictions = model.transform(test_df)
 
@@ -197,7 +197,7 @@ def train_regressor(spark: SparkSession):
 
     save_path = f"{MODELS_PATH}/linear_regression_fare"
     model.write().overwrite().save(save_path)
-    log.info(f"Model saved → {save_path} ✅")
+    log.info(f"Model saved → {save_path}")
 
     return model, {"rmse": rmse, "mae": mae, "r2": r2}
 
