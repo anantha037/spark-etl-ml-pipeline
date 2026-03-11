@@ -1,198 +1,266 @@
-# NYC Yellow Taxi — Big Data ETL & ML Pipeline
+# NYC Taxi Big Data Pipeline
 
-![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
-![Spark](https://img.shields.io/badge/Apache_Spark-3.5.1-orange?logo=apachespark)
 ![CI](https://github.com/anantha037/spark-etl-ml-pipeline/actions/workflows/ci.yml/badge.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)
-![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Spark](https://img.shields.io/badge/Apache%20Spark-3.5.1-orange)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-An end-to-end big data pipeline built with Apache Spark on the NYC TLC Yellow Taxi dataset (Jan–Mar 2023, **9.3 million trips**). Covers everything from raw Parquet ingestion to a trained ML model with live predictions — all running in under 3 minutes on a laptop.
+End-to-end big data pipeline on **9.3 million NYC Yellow Taxi trip records** — ETL, ML, REST API, interactive dashboard, and Docker deployment.
 
 ---
 
 ## What This Project Does
 
-Raw NYC taxi Parquet files go in. Cleaned data, trained models, and predictions come out.
+Raw Parquet files → Spark ETL → ML training → FastAPI predictions → Streamlit dashboard → Docker
 
+The pipeline processes NYC taxi data at scale, trains a Random Forest model to predict generous tippers, and serves predictions through a REST API and interactive dashboard — all packaged in Docker for one-command deployment.
+
+---
+
+## Quick Start (Docker)
+
+```bash
+git clone https://github.com/anantha037/spark-etl-ml-pipeline
+cd spark-etl-ml-pipeline
+
+# Add raw data files to data/raw/ (see Dataset section)
+docker-compose up --build
 ```
-Raw Parquet Files (3 months, ~1.5GB)
-        │
-        ▼
-  ┌─────────────┐
-  │   EXTRACT   │  Schema normalization, union 9.3M rows
-  └──────┬──────┘
-         │
-         ▼
-  ┌─────────────┐
-  │  TRANSFORM  │  Clean, impute nulls, engineer 10 features
-  └──────┬──────┘
-         │
-         ▼
-  ┌─────────────┐
-  │    LOAD     │  Parquet warehouse (partitioned) + PostgreSQL
-  └──────┬──────┘
-         │
-         ▼
-  ┌─────────────┐
-  │  ML PREP   │  Remove leakage, encode, scale → feature vectors
-  └──────┬──────┘
-         │
-         ▼
-  ┌─────────────┐
-  │    TRAIN    │  Random Forest (80% accuracy) + Linear Regression (R²=0.943)
-  └──────┬──────┘
-         │
-         ▼
-  1,787,917 predictions with confidence scores
-```
+
+| Service | URL |
+|---------|-----|
+| Streamlit Dashboard | http://localhost:8501 |
+| FastAPI Swagger UI | http://localhost:8000/docs |
+| API Health Check | http://localhost:8000/health |
+
+First build takes ~10 minutes (Java 21 + Python packages). Subsequent starts take ~30 seconds.
 
 ---
 
 ## Results
 
-| Task | Model | Key Metric |
-|------|-------|------------|
-| Tip classification (generous tipper?) | Random Forest (tuned) | **80.0% accuracy, AUC 0.789** |
-| Fare prediction | Linear Regression | **R² = 0.943, MAE = $1.38** |
+### ETL Pipeline
 
-**ETL:** 9,384,487 raw rows → 8,934,307 clean rows (4.8% removed) in **79 seconds**  
-**Full pipeline:** Raw data → predictions in **3 minutes**
+| Metric | Value |
+|--------|-------|
+| Raw rows | 9,384,487 |
+| Clean rows | 8,934,307 |
+| Rows removed | 450,180 (4.8%) |
+| Runtime | **79 seconds** |
+
+### ML — Random Forest (Tip Classification)
+
+| Metric | Value |
+|--------|-------|
+| Accuracy | **80.0%** |
+| AUC-ROC | **0.789** |
+| F1 Score | **0.778** |
+| Precision | **0.849** |
+| Recall | **0.800** |
+
+### ML — Linear Regression (Fare Prediction)
+
+| Metric | Value |
+|--------|-------|
+| R² Score | **0.943** |
+| RMSE | **$4.04** |
+| MAE | **$1.38** |
+
+### Full Pipeline Runtime
+
+| Stage | Time |
+|-------|------|
+| ETL | 79.6s |
+| ML Prep | 9.2s |
+| Prediction | 33.5s |
+| Save | 54.5s |
+| **Total** | **~3 minutes** |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│              RAW DATA (9.38M rows)                  │
+│   3x Monthly Parquet files — NYC TLC Yellow Taxi    │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                  ETL PIPELINE                       │
+│  extract.py → transform.py → load.py               │
+│  • Schema normalization across months               │
+│  • 17 quality filters → 450K rows removed          │
+│  • 10 features engineered                          │
+│  • Output: partitioned Parquet + PostgreSQL         │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                  ML PIPELINE                        │
+│  data_prep → train_model → evaluate_and_tune       │
+│  • 80/20 split → 7.1M train rows                  │
+│  • Random Forest (classification)                  │
+│  • Linear Regression (fare prediction)             │
+│  • 3-fold CV, 8-combo hyperparameter tuning        │
+└──────────┬──────────────────────┬───────────────────┘
+           │                      │
+           ▼                      ▼
+┌──────────────────┐   ┌──────────────────────┐
+│   FastAPI        │   │  Streamlit Dashboard  │
+│   api.py         │   │  dashboard.py         │
+│   :8000          │   │  :8501                │
+└──────────┬───────┘   └──────────┬────────────┘
+           │                      │
+           └──────────┬───────────┘
+                      ▼
+         ┌────────────────────────┐
+         │    Docker Compose      │
+         │  API + Dashboard + DB  │
+         └────────────────────────┘
+```
 
 ---
 
 ## Project Structure
 
 ```
-spark-etl-ml-project/
+spark-etl-ml-pipeline/
 ├── src/
 │   ├── etl/
-│   │   ├── extract.py          # Read + normalize 3 Parquet files
-│   │   ├── transform.py        # Clean, impute, feature engineer
-│   │   └── load.py             # Write Parquet warehouse + PostgreSQL
+│   │   ├── extract.py          # Load + normalize Parquet files
+│   │   ├── transform.py        # Clean + feature engineer
+│   │   └── load.py             # Write Parquet + PostgreSQL
 │   ├── ml/
-│   │   ├── data_prep.py        # Remove leakage, build feature pipeline
-│   │   ├── train_model.py      # Random Forest + Linear Regression
-│   │   └── evaluate_and_tune.py # Confusion matrix, CV grid search
+│   │   ├── data_prep.py        # Train/test split, feature vectors
+│   │   ├── train_model.py      # RF classifier + LR regressor
+│   │   └── evaluate_and_tune.py# CrossValidator + metrics
 │   └── pipeline/
-│       ├── etl_pipeline.py     # ETL orchestration
-│       ├── etl_optimizer.py    # Benchmark: pruning, caching, AQE
-│       └── full_pipeline.py    # End-to-end: raw data → predictions
+│       ├── etl_pipeline.py     # Orchestrate ETL
+│       ├── etl_optimizer.py    # Benchmark optimizations
+│       └── full_pipeline.py    # End-to-end runner
+│
 ├── models/
-│   ├── feature_pipeline/       # Fitted Spark ML Pipeline
-│   ├── random_forest_classifier/
-│   ├── linear_regression_fare/
-│   └── rf_tuned_best/          # Tuned model (production)
-├── notebooks/
-│   └── 01_data_exploration.ipynb
-├── data/
-│   ├── raw/                    # Place source Parquet files here
-│   ├── processed/              # Generated — partitioned by month
-│   ├── ml/                     # Generated — train/test splits
-│   └── output/                 # Generated — predictions
-├── jars/
-│   └── postgresql-42.7.3.jar
+│   ├── feature_pipeline/       # Saved PipelineModel
+│   ├── rf_tuned_best/          # Tuned RF model (served by API)
+│   └── linear_regression_fare/ # Fare prediction model
+│
+├── .github/workflows/
+│   └── ci.yml                  # Automated API tests on every push
+│
+├── api.py                      # FastAPI REST endpoint
+├── dashboard.py                # Streamlit dashboard
+├── Dockerfile.api
+├── Dockerfile.dashboard
+├── docker-compose.yml
+├── requirements.txt
 └── docs/
+    └── PROJECT_DOCUMENTATION.md
 ```
 
 ---
 
-## Tech Stack
+## Dataset
 
-- **Apache Spark 3.5.1** — distributed data processing engine
-- **PySpark** — Python API for Spark
-- **Python 3.10** — core language
-- **Spark MLlib** — Random Forest, Linear Regression, CrossValidator, Pipelines
-- **PostgreSQL** — summary + prediction output tables
-- **Apache Parquet** — columnar data warehouse format
-- **WSL2 Ubuntu** — Linux environment on Windows
+NYC TLC Yellow Taxi Trip Records — January, February, March 2023.
+
+Download from: https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
+
+Place files in `data/raw/`:
+```
+data/raw/
+├── yellow_tripdata_2023-01.parquet
+├── yellow_tripdata_2023-02.parquet
+└── yellow_tripdata_2023-03.parquet
+```
+
+> Raw data files are not included in the repo (too large for git). The `.gitignore` excludes them.
 
 ---
 
-## Setup
-
-### Prerequisites
-
-- Python 3.10+
-- Java 11 (OpenJDK)
-- Apache Spark 3.5.1 installed at `/opt/spark`
-- PostgreSQL running locally
-- WSL2 Ubuntu (if on Windows) — recommended
-
-### Install
+## Local Setup (Without Docker)
 
 ```bash
-git clone https://github.com/<your-username>/spark-etl-ml-pipeline.git
-cd spark-etl-ml-pipeline
-
-python -m venv venv
+# 1. Create virtual environment
+python3 -m venv venv
 source venv/bin/activate
-pip install pyspark==3.5.1 numpy pandas
+pip install -r requirements.txt
+
+# 2. Set up PostgreSQL
+sudo -u postgres psql -c "CREATE DATABASE nyc_taxi;"
+sudo -u postgres psql -c "CREATE USER anantha WITH PASSWORD 'spark123';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE nyc_taxi TO anantha;"
+
+# 3. Run the full pipeline
+python src/pipeline/full_pipeline.py
+
+# 4. Start the API
+uvicorn api:app --reload --port 8000
+
+# 5. Start the dashboard
+streamlit run dashboard.py
 ```
-
-### Get the Data
-
-Download from [NYC TLC Trip Record Data](https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page):
-
-```bash
-mkdir -p data/raw
-# Download yellow_tripdata_2023-01.parquet, 02, 03 into data/raw/
-```
-
-### PostgreSQL Setup
-
-```bash
-sudo -u postgres psql
-CREATE DATABASE nyc_taxi;
-CREATE USER anantha WITH PASSWORD 'spark123';
-GRANT ALL PRIVILEGES ON DATABASE nyc_taxi TO anantha;
-\q
-```
-
-Update the `POSTGRES_URL` and `POSTGRES_PROPS` in `full_pipeline.py` with your credentials.
 
 ---
 
-## Running the Pipeline
+## API Usage
 
-### Full Pipeline (recommended)
-
-```bash
-python src/pipeline/full_pipeline.py
-```
-
-This runs everything: Extract → Transform → Load → ML Prep → Train → Predict → Save.
-
-### Individual Phases
+### Single Prediction
 
 ```bash
-# ETL only
-python src/pipeline/etl_pipeline.py
-
-# Optimization benchmarks
-python src/pipeline/etl_optimizer.py
-
-# ML training only (needs ETL done first)
-python src/ml/train_model.py
-
-# Evaluation + hyperparameter tuning
-python src/ml/evaluate_and_tune.py
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_type": 1,
+    "trip_distance": 3.5,
+    "fare_amount": 15.0,
+    "trip_duration_min": 20.0,
+    "pickup_hour": 18,
+    "pickup_dayofweek": 5
+  }'
 ```
+
+**Response:**
+```json
+{
+  "prediction": 1,
+  "prediction_label": "Generous Tipper",
+  "confidence": 0.76,
+  "confidence_pct": "76.0%",
+  "inference_method": "rule_based_fallback",
+  "inference_time_ms": 9.4
+}
+```
+
+### Other Endpoints
+
+```bash
+GET  /health         # Health check
+GET  /model/info     # Model metadata and metrics
+GET  /stats          # Full pipeline statistics
+POST /predict/batch  # Up to 100 trips in one request
+```
+
+Full interactive docs at `http://localhost:8000/docs`
 
 ---
 
 ## Key Technical Decisions
 
-**Schema normalization across files**  
-The January file encodes some columns as BIGINT while Feb/Mar use INT32. Reading files individually, casting to LongType, then unioning on common columns handles this. Using Spark's built-in `mergeSchema` does not work here because it cannot resolve the type conflict.
+**Why read files individually instead of using a wildcard glob?**
+January uses INT32 for integer columns; February and March use INT64. A wildcard read silently applies January's schema to all files, corrupting the union. Reading individually and normalizing with `LongType` casts before unioning fixes this.
 
-**Lazy evaluation + single persist**  
-Calling `.count()` after each transform step caused JVM OOM crashes (full 9.3M row scan per step). The fix: `StorageLevel.MEMORY_AND_DISK` after extract, then all transforms stay lazy. Only 2 `.count()` calls in the entire pipeline.
+**Why `persist(MEMORY_AND_DISK)` instead of `cache()`?**
+On an 8GB machine, caching 8.9M rows into JVM heap runs out of memory. `MEMORY_AND_DISK` spills to disk when heap fills, preventing JVM crashes at the cost of slightly slower access on overflow.
 
-**Removing data leakage**  
-`tip_amount` and `tip_pct` directly encode the target (`generous_tipper`). Including them gives 99%+ fake accuracy. Properly removing these plus `total_amount` and `fare_per_mile` brings accuracy to its honest 80%.
+**Why is caching shown as 0.3x in benchmarks?**
+Caching was slower than re-reading from Parquet for only 3 operations on an SSD. The serialization overhead exceeds savings until you reuse the same DataFrame 8+ times, or when reading from slow remote storage.
 
-**Payment type dominates**  
-Feature importance shows `payment_type` at 93.4%. This makes sense — cash passengers literally cannot tip electronically in this dataset. This is a dataset artifact, not a model flaw.
+**Why a rule-based fallback in the API?**
+Starting a SparkSession takes 8–12 seconds for JVM initialization. The rule-based fallback captures 93% of the model's behavior (payment type dominates feature importance) and delivers instant responses when Spark is not warm.
 
 ---
 
@@ -203,43 +271,47 @@ Feature importance shows `payment_type` at 93.4%. This makes sense — cash pass
 | Column Pruning | 37.8s | 6.3s | **6.0x** |
 | Partition Pruning | 4.5s | 2.1s | **2.1x** |
 | AQE | 7.8s | 5.5s | **1.4x** |
-| Caching (3 ops) | 16.2s | 59.4s | 0.3x (SSD faster) |
+| Caching (3 ops) | 16.2s | 59.4s | 0.3x ⚠️ |
+
+Column pruning wins because Parquet is columnar — unused columns are never read from disk. Caching was slower here because data is on SSD and only 3 operations ran over the cached data.
 
 ---
 
-## ML Results Detail
+## CI/CD
 
-**Random Forest Classifier — Confusion Matrix (test set: 1,787,917 rows)**
+GitHub Actions runs 7 automated tests on every push to `main`:
 
-|  | Predicted Not Generous | Predicted Generous |
-|--|--|--|
-| **Actual Not Generous** | 327,423 (TN) | 358,154 (FP) |
-| **Actual Generous** | 59 (FN) | 1,102,281 (TP) |
+- `GET /health` — status and version checks
+- `GET /model/info` — accuracy and AUC threshold assertions
+- `GET /stats` — ETL and ML row count validation
+- `POST /predict` — credit card trip (expects generous prediction)
+- `POST /predict` — cash trip (expects not-generous, low confidence)
+- `POST /predict/batch` — 2-trip batch
+- Validation test — invalid input must return `HTTP 422`
 
-The model almost never misses a real generous tipper (FN = 59 out of 1.1M). The false positives are card-paying passengers whose tip ended up below 20%.
-
----
-
-## What's Next
-
-- [ ] Streamlit dashboard for interactive trip predictions
-- [ ] FastAPI endpoint for real-time inference
-- [ ] Docker + docker-compose for one-command setup
-- [ ] GitHub Actions CI/CD pipeline
-- [ ] Full year (12 months) of data for seasonal modeling
+**Runtime: ~33 seconds per run**
 
 ---
 
-## Dataset
+## Stack
 
-NYC TLC Yellow Taxi Trip Records — publicly available at  
-https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
-
-Data files are not included in this repository due to size (~1.5GB). See Setup above to download them.
+| Layer | Technology |
+|-------|-----------|
+| Data processing | Apache Spark 3.5.1, PySpark |
+| Storage | Parquet (partitioned), PostgreSQL 15 |
+| ML | Spark MLlib (Random Forest, Linear Regression) |
+| API | FastAPI, Uvicorn, Pydantic |
+| Dashboard | Streamlit, PyArrow, Plotly |
+| Containerization | Docker, Docker Compose |
+| CI/CD | GitHub Actions |
+| Language | Python 3.10 |
 
 ---
 
-## Author
+## Full Documentation
 
-**Anantha Krishnan**  
-Built as a big data engineering and ML portfolio project — March 2026
+See [`docs/PROJECT_DOCUMENTATION.md`](docs/PROJECT_DOCUMENTATION.md) for complete technical documentation including schema details, all challenge/fix writeups, feature importance analysis, and optimization deep-dives.
+
+---
+
+*Built by Anantha — March 2026*
