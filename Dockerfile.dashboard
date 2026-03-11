@@ -1,0 +1,48 @@
+# Dockerfile.dashboard
+# Streamlit Dashboard
+
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install Java 11 (required for PySpark)
+RUN apt-get update && apt-get install -y \
+    openjdk-21-jre-headless \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy source code, models, and data
+COPY src/ ./src/
+COPY models/ ./models/
+COPY dashboard.py .
+
+# Streamlit config — disable the default "Deploy" button and telemetry
+RUN mkdir -p /root/.streamlit
+RUN echo '\
+[general]\n\
+email = ""\n\
+\n\
+[server]\n\
+headless = true\n\
+enableCORS = false\n\
+port = 8501\n\
+\n\
+[browser]\n\
+gatherUsageStats = false\n\
+' > /root/.streamlit/config.toml
+
+RUN mkdir -p data/raw data/processed data/ml data/output
+
+EXPOSE 8501
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
+  CMD curl -f http://localhost:8501/_stcore/health || exit 1
+
+CMD ["streamlit", "run", "dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]

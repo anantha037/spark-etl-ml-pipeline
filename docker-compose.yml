@@ -1,0 +1,77 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: nyc_taxi_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nyc_taxi
+      POSTGRES_USER: anantha
+      POSTGRES_PASSWORD: spark123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U anantha -d nyc_taxi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Prediction Endpoint ─────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: nyc_taxi_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount processed data and predictions so the API can read them
+      - ./data/processed:/app/data/processed:ro
+      - ./data/output:/app/data/output:ro
+      - ./models:/app/models:ro
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=nyc_taxi
+      - POSTGRES_USER=anantha
+      - POSTGRES_PASSWORD=spark123
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+
+  # ── Streamlit Dashboard ─────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: nyc_taxi_dashboard
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data/processed:/app/data/processed:ro
+      - ./data/output:/app/data/output:ro
+      - ./models:/app/models:ro
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 1.5g
+
+
+volumes:
+  postgres_data:
