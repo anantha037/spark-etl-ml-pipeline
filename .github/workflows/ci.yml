@@ -1,0 +1,160 @@
+name: NYC Taxi API — CI Tests
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-api:
+    name: API Health & Prediction Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout code ───────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ───────────────────────────────────────────────────
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+
+      # ── 3. Install dependencies ────────────────────────────────────────────
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi uvicorn pydantic httpx pytest
+
+      # ── 4. Start API in background ─────────────────────────────────────────
+      - name: Start FastAPI server
+        run: |
+          uvicorn api:app --host 0.0.0.0 --port 8000 &
+          echo "Waiting for API to start..."
+          sleep 8
+
+      # ── 5. Run tests ───────────────────────────────────────────────────────
+      - name: Test — GET /health
+        run: |
+          curl -sf http://localhost:8000/health | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Health response:', json.dumps(data, indent=2))
+          assert data['status'] == 'healthy', 'Status is not healthy'
+          assert 'api_version' in data, 'Missing api_version'
+          print('PASS: /health')
+          "
+
+      - name: Test — GET /model/info
+        run: |
+          curl -sf http://localhost:8000/model/info | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Model info:', json.dumps(data, indent=2))
+          assert data['accuracy'] > 0.75, 'Accuracy below expected threshold'
+          assert data['auc_roc'] > 0.70, 'AUC below expected threshold'
+          assert data['training_rows'] == 7146390, 'Unexpected training row count'
+          print('PASS: /model/info')
+          "
+
+      - name: Test — GET /stats
+        run: |
+          curl -sf http://localhost:8000/stats | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          assert data['etl']['raw_rows'] == 9384487, 'Unexpected raw row count'
+          assert data['etl']['clean_rows'] == 8934307, 'Unexpected clean row count'
+          assert data['ml']['classifier']['accuracy'] > 0.75
+          print('PASS: /stats')
+          "
+
+      - name: Test — POST /predict (Credit Card trip)
+        run: |
+          curl -sf -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{
+              "payment_type": 1,
+              "trip_distance": 3.5,
+              "fare_amount": 15.0,
+              "trip_duration_min": 20.0,
+              "pickup_hour": 18,
+              "pickup_dayofweek": 5,
+              "passenger_count": 1,
+              "is_airport_trip": 0
+            }' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Prediction:', json.dumps(data, indent=2))
+          assert data['prediction'] in [0, 1], 'Prediction must be 0 or 1'
+          assert 0 <= data['confidence'] <= 1, 'Confidence out of range'
+          assert 'prediction_label' in data, 'Missing prediction_label'
+          assert 'inference_method' in data, 'Missing inference_method'
+          print('PASS: /predict (credit card trip)')
+          "
+
+      - name: Test — POST /predict (Cash trip)
+        run: |
+          curl -sf -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{
+              "payment_type": 2,
+              "trip_distance": 2.0,
+              "fare_amount": 10.0,
+              "trip_duration_min": 12.0,
+              "pickup_hour": 14,
+              "pickup_dayofweek": 3
+            }' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Cash prediction:', json.dumps(data, indent=2))
+          assert data['prediction'] == 0, 'Cash payment should predict not-generous'
+          assert data['confidence'] < 0.3, 'Cash confidence should be low'
+          print('PASS: /predict (cash trip — correctly low confidence)')
+          "
+
+      - name: Test — POST /predict/batch
+        run: |
+          curl -sf -X POST http://localhost:8000/predict/batch \
+            -H "Content-Type: application/json" \
+            -d '{
+              "trips": [
+                {"payment_type": 1, "trip_distance": 5.0, "fare_amount": 20.0,
+                 "trip_duration_min": 25.0, "pickup_hour": 9, "pickup_dayofweek": 2},
+                {"payment_type": 2, "trip_distance": 1.5, "fare_amount": 8.0,
+                 "trip_duration_min": 8.0, "pickup_hour": 22, "pickup_dayofweek": 6}
+              ]
+            }' | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          print('Batch result:', json.dumps(data, indent=2))
+          assert data['total'] == 2, 'Expected 2 predictions'
+          assert len(data['predictions']) == 2, 'Expected 2 results'
+          print('PASS: /predict/batch (2 trips)')
+          "
+
+      - name: Test — Validation (invalid input should return 422)
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"payment_type": 99, "trip_distance": -5.0,
+                 "fare_amount": 15.0, "trip_duration_min": 20.0,
+                 "pickup_hour": 18, "pickup_dayofweek": 5}')
+          echo "Validation response code: $STATUS"
+          if [ "$STATUS" = "422" ]; then
+            echo "PASS: Invalid input correctly rejected with 422"
+          else
+            echo "FAIL: Expected 422, got $STATUS"
+            exit 1
+          fi
+
+      # ── 6. Summary ─────────────────────────────────────────────────────────
+      - name: All tests passed
+        run: |
+          echo "========================================"
+          echo "  All API tests passed successfully"
+          echo "  NYC Taxi Tip Predictor API — v1.0.0"
+          echo "========================================"
