@@ -2,6 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10-blue?logo=python)
 ![Spark](https://img.shields.io/badge/Apache_Spark-3.5.1-orange?logo=apachespark)
+![CI](https://github.com/anantha037/spark-etl-ml-pipeline/actions/workflows/ci.yml/badge.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-336791?logo=postgresql)
 ![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
 
